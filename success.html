@@ -16,30 +16,67 @@
       min-height: 100vh;
       padding: 24px;
     }
+
     .card {
-      max-width: 560px;
+      max-width: 580px;
+      width: 100%;
       background: white;
       border-radius: 22px;
       padding: 32px;
       box-shadow: 0 18px 45px rgba(0,0,0,0.12);
       text-align: center;
     }
-    h1 {
-      margin-top: 0;
-      font-size: 30px;
+
+    .brand {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 32px;
+      letter-spacing: .10em;
+      text-transform: uppercase;
+      color: #071725;
+      margin-bottom: 4px;
     }
+
+    .brand span { color: #d8a83f; }
+
+    .tagline {
+      color: #0f6b78;
+      font-size: 11px;
+      letter-spacing: .20em;
+      text-transform: uppercase;
+      font-weight: 800;
+      margin-bottom: 26px;
+    }
+
+    h1 {
+      margin: 0 0 14px;
+      font-size: 30px;
+      color: #071725;
+    }
+
     p {
       font-size: 17px;
       line-height: 1.5;
       color: #42525c;
+      margin: 0 0 18px;
     }
+
     .status {
-      margin: 20px 0;
+      margin: 22px 0;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: #eef7f5;
+      color: #0f6b78;
       font-weight: bold;
     }
+
+    .error {
+      background: #fff1f1;
+      color: #9b1c1c;
+    }
+
     .btn {
       display: none;
-      margin-top: 22px;
+      margin-top: 18px;
       padding: 15px 26px;
       border-radius: 999px;
       background: linear-gradient(90deg, #062b36, #2fc7b7);
@@ -47,38 +84,59 @@
       text-decoration: none;
       font-weight: 800;
       letter-spacing: .04em;
+      box-shadow: 0 12px 26px rgba(7,23,37,.18);
     }
-    .error {
-      color: #9b1c1c;
-      font-weight: bold;
+
+    .btn.secondary {
+      display: inline-flex;
+      background: white;
+      color: #071725;
+      border: 1px solid rgba(216,168,63,.45);
+      box-shadow: none;
+      margin-left: 6px;
+    }
+
+    .fineprint {
+      font-size: 13px;
+      color: #607484;
+      margin-top: 26px;
     }
   </style>
 </head>
+
 <body>
-  <div class="card">
-    <h1>AirTrueIQ Download</h1>
+  <main class="card">
+    <div class="brand">AirTrue<span>IQ</span></div>
+    <div class="tagline">Know the Air. Know Yourself.</div>
+
+    <h1>AirAware Secure Download</h1>
     <p>Thank you. We are verifying your secure Stripe payment.</p>
 
     <div id="status" class="status">Checking payment...</div>
 
-    <a id="downloadBtn" class="btn" href="/downloads/airtrueiq.apk" download>
-      Download AirTrueIQ APK
+    <a id="downloadBtn" class="btn" href="#">
+      Download AirAware APK
     </a>
 
-    <p style="font-size:13px;margin-top:28px;">
+    <a class="btn secondary" href="/">
+      Return to AirTrueIQ
+    </a>
+
+    <p class="fineprint">
       If the download button does not appear after a few seconds, please contact support with your payment email.
     </p>
-  </div>
+  </main>
 
   <script>
     async function verifyPayment() {
       const params = new URLSearchParams(window.location.search);
       const sessionId = params.get("session_id");
+
       const statusEl = document.getElementById("status");
       const downloadBtn = document.getElementById("downloadBtn");
 
       if (!sessionId) {
-        statusEl.textContent = "Missing Stripe session ID.";
+        statusEl.textContent = "Missing Stripe session ID. Please return to the purchase page and try again.";
         statusEl.className = "status error";
         return;
       }
@@ -87,13 +145,30 @@
         const res = await fetch("/api/verify-session?session_id=" + encodeURIComponent(sessionId));
         const data = await res.json();
 
-        if (data && data.paid) {
-          statusEl.textContent = "Payment verified. Your download is ready.";
-          downloadBtn.style.display = "inline-block";
-        } else {
-          statusEl.textContent = "Payment not verified yet. Please refresh in a moment.";
-          statusEl.className = "status error";
+        /*
+          Supports either API response style:
+          - { paid: true }
+          - { ok: true, allowDownload: true }
+        */
+        const verified = data && (data.paid === true || data.ok === true);
+        const allowDownload = data && (data.allowDownload !== false);
+
+        if (verified && allowDownload) {
+          statusEl.textContent = "Payment verified. Your secure download is ready.";
+          statusEl.className = "status";
+          downloadBtn.href = "/api/download-apk?session_id=" + encodeURIComponent(sessionId);
+          downloadBtn.style.display = "inline-flex";
+          return;
         }
+
+        if (verified && !allowDownload) {
+          statusEl.textContent = "Your Premium membership is confirmed. No APK download is attached to this subscription checkout.";
+          statusEl.className = "status";
+          return;
+        }
+
+        statusEl.textContent = "Payment not verified yet. Please refresh in a moment.";
+        statusEl.className = "status error";
       } catch (err) {
         statusEl.textContent = "Verification error. Please refresh or contact support.";
         statusEl.className = "status error";
