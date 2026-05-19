@@ -1,83 +1,81 @@
 // api/openai.js
 // AirTrueIQ / AirAware Wellness Report API
-// v82r8-compatible: includes PPD / Inverse PPD transitionPattern handling
+// v82r9: CORS-safe, APK-safe, PPD-aware
 
-export default async function handler(req, res) {
-  // CORS for APK WebView / browser calls
+function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Max-Age", "86400");
+}
+
+function safeReportFallback(message, payload = {}) {
+  const transition = payload.transitionPattern || {};
+  return {
+    headline: "AirTrueIQ report service notice",
+    summary: message || "The report service could not complete the AI request.",
+    transitionNote: transition.active
+      ? `${transition.type || "Transition pattern"} detected: ${transition.summary || "A PLD / air-density divergence pattern was included in the app payload."}`
+      : "No active PPD / Inverse PPD transition pattern was detected in the payload.",
+    bpNote: "Use BP entries only as personal wellness context. Use a real cuff/device for BP decisions.",
+    bodyNote: "Body response may differ by profile. Sensitive, higher-BP, lower-BP, or narrow-pulse-pressure patterns may respond differently.",
+    suggestions: [
+      "Retest the wellness report after confirming internet connection.",
+      "Log symptoms, BP, pulse, and the transition pattern if you notice a body response.",
+      "Use this as wellness guidance only, not medical advice."
+    ],
+    confidence: "low",
+    disclaimer: "Wellness guidance only. Not medical advice."
+  };
+}
+
+export default async function handler(req, res) {
+  setCors(res);
 
   if (req.method === "OPTIONS") {
-    return res.status(200).end();
+    return res.status(200).json({ ok: true });
   }
 
   if (req.method !== "POST") {
-    return res.status(405).json({
-      error: "Method not allowed. Use POST."
-    });
+    return res.status(405).json({ error: "Method not allowed. Use POST." });
   }
+
+  const payload = req.body || {};
 
   try {
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
-      return res.status(500).json({
-        error: "OPENAI_API_KEY is missing on the server."
-      });
+      return res.status(200).json(
+        safeReportFallback("OPENAI_API_KEY is missing on the server.", payload)
+      );
     }
 
-    const payload = req.body || {};
     const transition = payload.transitionPattern || {};
     const transitionActive = !!transition.active;
-
-    const transitionInstruction = transitionActive
-      ? `
-IMPORTANT TRANSITION PATTERN:
-The app detected ${transition.type || "a PLD / air-density divergence pattern"}.
-Level: ${transition.level || "unknown"}.
-Summary: ${transition.summary || "No summary provided."}
-Direction feel: ${transition.directionFeel || "not specified"}.
-Peak time: ${transition.peakTime || "n/a"}.
-Peak PLD: ${transition.peakPLD ?? "n/a"}.
-Low time: ${transition.lowTime || "n/a"}.
-Low PLD: ${transition.lowPLD ?? "n/a"}.
-Current time: ${transition.currentTime || "n/a"}.
-Current PLD: ${transition.currentPLD ?? "n/a"}.
-Current density: ${transition.currentDensity ?? "n/a"}.
-Drop from peak: ${transition.dropFromPeak ?? "n/a"} m DA.
-Rebound from low: ${transition.reboundFromLow ?? "n/a"} m DA.
-Density slope: ${transition.densitySlope ?? "n/a"}.
-PLD slope: ${transition.pldSlope ?? "n/a"}.
-Profile note: ${transition.profileNote || "Sensitive users may respond differently by profile."}
-
-You MUST specifically explain this transition pattern in the report.
-Do not give a generic weather report.
-Use careful wellness wording. Do not claim medical causation.
-`
-      : `
-No active PPD / Inverse PPD transition pattern was detected.
-If discussing trends, say no specific divergence pattern was flagged.
-`;
 
     const systemPrompt = `
 You are AirTrueIQ's wellness report engine.
 
-You generate concise, specific, non-medical wellness guidance based on atmospheric data supplied by the AirAware/AirTrueIQ app.
+Return JSON only. Do not use markdown.
+
+You create concise, specific, non-medical wellness guidance from AirAware/AirTrueIQ atmospheric data.
 
 Rules:
-- Return JSON only.
-- Do not use markdown.
-- Do not diagnose, prescribe, or claim medical causation.
-- Do not say the app "caused" symptoms.
-- Use wording like "may feel", "may notice", "worth logging", "transition window", "wellness guidance only".
-- If transitionPattern is active, you MUST address it directly using its type, level, drop/rebound amount, density direction, and profile note.
-- If BP or pulse data is present, discuss it carefully as user-entered context, not as a diagnosis.
-- If the user has lower-BP, higher-BP, narrow pulse pressure, or sensitivity context, mention that profiles may respond differently.
-- Keep it practical and specific. Avoid lazy generic advice.
-- Include a disclaimer.
+- Do not diagnose.
+- Do not claim medical causation.
+- Do not say the air caused symptoms.
+- Use careful phrases: may feel, may notice, worth logging, transition window, wellness guidance only.
+- If transitionPattern.active is true, you MUST address it specifically.
+- If transitionPattern.type is Post-Peak Divergence, explain the descending-gap transition: air density rising while PLD drops from a recent peak.
+- If transitionPattern.type is Inverse Post-Peak Divergence, explain the ascending-gap transition: air density easing while PLD rebounds from a recent low.
+- Mention dropFromPeak or reboundFromLow if provided.
+- Mention density direction/slope and PLD slope if provided.
+- Mention that higher-BP, lower-BP, narrow-pulse-pressure, or sensitive profiles may respond differently if provided or relevant.
+- Avoid generic weather advice.
+- Keep suggestions practical and mild.
 
-Return this JSON shape exactly:
+Return exactly this JSON shape:
 {
   "headline": "string",
   "summary": "string",
@@ -91,15 +89,16 @@ Return this JSON shape exactly:
 `;
 
     const userPrompt = `
-Generate an AirTrueIQ wellness report from this app payload.
+Generate an AirTrueIQ wellness report from this payload.
 
-${transitionInstruction}
+transitionPatternActive: ${transitionActive}
+transitionPattern: ${JSON.stringify(transition, null, 2)}
 
-Full payload:
+Full app payload:
 ${JSON.stringify(payload, null, 2)}
 `;
 
-    const openaiResponse = await fetch("https://api.openai.com/v1/responses", {
+    const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
@@ -108,77 +107,62 @@ ${JSON.stringify(payload, null, 2)}
       body: JSON.stringify({
         model: "gpt-4.1-mini",
         input: [
-          {
-            role: "system",
-            content: systemPrompt
-          },
-          {
-            role: "user",
-            content: userPrompt
-          }
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
         ],
         text: {
-          format: {
-            type: "json_object"
-          }
+          format: { type: "json_object" }
         }
       })
     });
 
-    const raw = await openaiResponse.text();
+    const raw = await response.text();
 
-    if (!openaiResponse.ok) {
-      return res.status(openaiResponse.status).json({
-        error: "OpenAI request failed.",
-        status: openaiResponse.status,
-        details: raw
-      });
+    if (!response.ok) {
+      return res.status(200).json(
+        safeReportFallback(
+          `OpenAI request failed: HTTP ${response.status}. ${raw.slice(0, 300)}`,
+          payload
+        )
+      );
     }
 
-    let parsed;
+    let wrapper;
     try {
-      parsed = JSON.parse(raw);
+      wrapper = JSON.parse(raw);
     } catch (e) {
-      return res.status(500).json({
-        error: "OpenAI returned non-JSON wrapper.",
-        details: raw.slice(0, 1000)
-      });
+      return res.status(200).json(
+        safeReportFallback("OpenAI wrapper was not valid JSON.", payload)
+      );
     }
 
-    let outputText = "";
-
-    try {
-      outputText =
-        parsed.output?.[0]?.content?.[0]?.text ||
-        parsed.output_text ||
-        "";
-    } catch (e) {
-      outputText = "";
-    }
+    const outputText =
+      wrapper.output_text ||
+      wrapper.output?.[0]?.content?.[0]?.text ||
+      "";
 
     if (!outputText) {
-      return res.status(500).json({
-        error: "OpenAI response had no output text.",
-        details: parsed
-      });
+      return res.status(200).json(
+        safeReportFallback("OpenAI returned no usable report text.", payload)
+      );
     }
 
     let report;
     try {
       report = JSON.parse(outputText);
     } catch (e) {
-      return res.status(500).json({
-        error: "OpenAI output was not valid JSON.",
-        outputText
-      });
+      return res.status(200).json(
+        safeReportFallback("OpenAI report text was not valid JSON.", payload)
+      );
     }
 
+    setCors(res);
     return res.status(200).json(report);
 
   } catch (err) {
-    return res.status(500).json({
-      error: "Server error in AirTrueIQ OpenAI handler.",
-      message: err.message || String(err)
-    });
+    setCors(res);
+    return res.status(200).json(
+      safeReportFallback(`Server error: ${err.message || String(err)}`, payload)
+    );
   }
 }
