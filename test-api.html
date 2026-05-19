@@ -1,1 +1,46 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>AirTrueIQ API Test</title>
+</head>
+<body style="font-family:Arial;padding:20px">
+  <h2>AirTrueIQ API POST Test</h2>
+  <button onclick="testApi()">Test OpenAI API</button>
+  <pre id="out" style="white-space:pre-wrap;background:#eee;padding:12px"></pre>
 
+  <script>
+    async function testApi() {
+      const out = document.getElementById("out");
+      out.textContent = "Testing...";
+
+      try {
+        const r = await fetch("https://www.airtrueiq.com/api/openai", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            test: true,
+            app: "AirTrueIQ",
+            score: 6.8,
+            bpProfile: "normal",
+            pulse: 72,
+            transitionPattern: "Convergence Watch",
+            flipFlop: { active: false },
+            compoundTrend: {
+              source: "visible timestamped 6-hour DA/PLD data",
+              densityNormDelta: 0.18,
+              pldDelta: -5.2,
+              compoundGapDelta: 0.31
+            }
+          })
+        });
+
+        const text = await r.text();
+        out.textContent = "HTTP " + r.status + "\n\n" + text;
+      } catch (e) {
+        out.textContent = "FETCH ERROR:\n" + e.message;
+      }
+    }
+  </script>
+</body>
+</html>
