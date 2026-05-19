@@ -1,6 +1,6 @@
 // api/openai.js
 // AirTrueIQ / AirAware Wellness Report API
-// v82r9: CORS-safe, APK-safe, PPD-aware
+// v82r12: CORS-safe, APK-safe, DA/PLD compound PPD + Inverse PPD + Flip-Flop aware
 
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -11,14 +11,18 @@ function setCors(res) {
 
 function safeReportFallback(message, payload = {}) {
   const transition = payload.transitionPattern || {};
+  const flip = transition.flipFlop || {};
+
   return {
     headline: "AirTrueIQ report service notice",
     summary: message || "The report service could not complete the AI request.",
-    transitionNote: transition.active
-      ? `${transition.type || "Transition pattern"} detected: ${transition.summary || "A PLD / air-density divergence pattern was included in the app payload."}`
-      : "No active PPD / Inverse PPD transition pattern was detected in the payload.",
+    transitionNote: flip.active
+      ? `Flip-Flop Transition detected: ${flip.summary || "PPD and Inverse PPD both occurred inside the rolling transition window."}`
+      : transition.active
+        ? `${transition.type || "Transition pattern"} detected: ${transition.summary || "A DA/PLD compound divergence pattern was included in the app payload."}`
+        : "No active PPD / Inverse PPD / Flip-Flop transition pattern was detected in the payload.",
     bpNote: "Use BP entries only as personal wellness context. Use a real cuff/device for BP decisions.",
-    bodyNote: "Body response may differ by profile. Sensitive, higher-BP, lower-BP, or narrow-pulse-pressure patterns may respond differently.",
+    bodyNote: "Body response may differ by profile. Sensitive, higher-BP, lower-BP, narrow-pulse-pressure, fatigue-sensitive, sinus/dental-pressure, or general sensitivity patterns may respond differently.",
     suggestions: [
       "Retest the wellness report after confirming internet connection.",
       "Log symptoms, BP, pulse, and the transition pattern if you notice a body response.",
@@ -52,7 +56,9 @@ export default async function handler(req, res) {
     }
 
     const transition = payload.transitionPattern || {};
+    const flip = transition.flipFlop || {};
     const transitionActive = !!transition.active;
+    const flipActive = !!flip.active;
 
     const systemPrompt = `
 You are AirTrueIQ's wellness report engine.
@@ -61,19 +67,31 @@ Return JSON only. Do not use markdown.
 
 You create concise, specific, non-medical wellness guidance from AirAware/AirTrueIQ atmospheric data.
 
-Rules:
+Core rules:
 - Do not diagnose.
 - Do not claim medical causation.
 - Do not say the air caused symptoms.
+- Do not tell the user to change medicine.
 - Use careful phrases: may feel, may notice, worth logging, transition window, wellness guidance only.
-- If transitionPattern.active is true, you MUST address it specifically.
-- If transitionPattern.type is Post-Peak Divergence, explain the descending-gap transition: air density rising while PLD drops from a recent peak.
-- If transitionPattern.type is Inverse Post-Peak Divergence, explain the ascending-gap transition: air density easing while PLD rebounds from a recent low.
-- Mention dropFromPeak or reboundFromLow if provided.
-- Mention density direction/slope and PLD slope if provided.
-- Mention that higher-BP, lower-BP, narrow-pulse-pressure, or sensitive profiles may respond differently if provided or relevant.
 - Avoid generic weather advice.
 - Keep suggestions practical and mild.
+- Always preserve the wellness boundary: this is not medical advice.
+
+DA/PLD compound divergence rules:
+- The app may send a transitionPattern object.
+- This object is based on a DA/PLD compound divergence state, not raw air-density-minus-PLD subtraction.
+- If transitionPattern.active is true, you MUST address it specifically.
+- If transitionPattern.type is Post-Peak Divergence, explain that the DA/PLD compound gap widened after convergence or near-convergence while air-density trend rose and PLD fell.
+- If transitionPattern.type is Inverse Post-Peak Divergence, explain that the compound gap widened in the opposite direction while air-density trend eased and PLD rose.
+- If transitionPattern.flipFlop.active is true or transitionPattern.transitionPattern is Flip-Flop Transition, explain that PPD and Inverse PPD both occurred in the rolling window and the body response may feel mixed or changeable by profile.
+- Mention compoundGapChange, densityNormSlope, pldNormSlope, pldSlope, densitySlope, nearConvergence, and source if provided.
+- If no transition is active, say no active DA/PLD divergence pattern was flagged.
+
+BP/body rules:
+- If BP profile is high, emphasize DA burden, density load, exertion caution, and using a real cuff/device.
+- If BP profile is low or narrow pulse pressure is provided, emphasize transition windows, lightheadedness caution, and gentle pacing.
+- If BP profile is average, keep tone moderate and avoid overstating risk.
+- Mention that higher-BP, lower-BP, narrow-pulse-pressure, fatigue-sensitive, sinus/dental-pressure, or sensitive profiles may respond differently if relevant.
 
 Return exactly this JSON shape:
 {
@@ -92,7 +110,13 @@ Return exactly this JSON shape:
 Generate an AirTrueIQ wellness report from this payload.
 
 transitionPatternActive: ${transitionActive}
-transitionPattern: ${JSON.stringify(transition, null, 2)}
+flipFlopActive: ${flipActive}
+
+transitionPattern:
+${JSON.stringify(transition, null, 2)}
+
+flipFlop:
+${JSON.stringify(flip, null, 2)}
 
 Full app payload:
 ${JSON.stringify(payload, null, 2)}
@@ -101,7 +125,7 @@ ${JSON.stringify(payload, null, 2)}
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
