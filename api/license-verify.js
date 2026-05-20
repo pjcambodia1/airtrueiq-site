@@ -1,11 +1,15 @@
 export default async function handler(req, res) {
-  // Basic CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS, GET");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
+  if (req.method === "OPTIONS") return res.status(200).end();
+
+  if (req.method === "GET") {
+    return res.status(405).json({
+      ok: false,
+      error: "Method not allowed. Use POST."
+    });
   }
 
   if (req.method !== "POST") {
@@ -26,45 +30,34 @@ export default async function handler(req, res) {
       });
     }
 
-    const body = req.body || {};
-    const licenseKey = String(body.licenseKey || "").trim();
-    const deviceId = String(body.deviceId || "").trim();
+    const licenseKey = String(req.body?.licenseKey || "").trim();
+    const deviceId = String(req.body?.deviceId || "").trim();
+    const appVersion = String(req.body?.appVersion || "").trim();
 
     if (!licenseKey) {
-      return res.status(400).json({
-        ok: false,
-        error: "Missing licenseKey."
-      });
+      return res.status(400).json({ ok: false, error: "Missing licenseKey." });
     }
 
     if (!deviceId) {
-      return res.status(400).json({
-        ok: false,
-        error: "Missing deviceId."
-      });
+      return res.status(400).json({ ok: false, error: "Missing deviceId." });
     }
 
-    // 1. Look up license
-    const licenseUrl =
-      `${SUPABASE_URL}/rest/v1/licenses` +
-      `?license_key=eq.${encodeURIComponent(licenseKey)}` +
-      `&select=*`;
+    const headers = {
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json"
+    };
 
-    const licenseResp = await fetch(licenseUrl, {
-      method: "GET",
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        "Content-Type": "application/json"
-      }
-    });
+    const licenseResp = await fetch(
+      `${SUPABASE_URL}/rest/v1/licenses?license_key=eq.${encodeURIComponent(licenseKey)}&select=*`,
+      { method: "GET", headers }
+    );
 
     if (!licenseResp.ok) {
-      const text = await licenseResp.text();
       return res.status(500).json({
         ok: false,
         error: "Supabase license lookup failed.",
-        details: text
+        details: await licenseResp.text()
       });
     }
 
@@ -90,38 +83,38 @@ export default async function handler(req, res) {
 
     const deviceLimit = Number(license.device_limit || 1);
 
-    // 2. Check existing activations for this license
-    const activationsUrl =
-      `${SUPABASE_URL}/rest/v1/license_activations` +
-      `?license_key=eq.${encodeURIComponent(licenseKey)}` +
-      `&select=*`;
-
-    const activationsResp = await fetch(activationsUrl, {
-      method: "GET",
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        "Content-Type": "application/json"
-      }
-    });
+    const activationsResp = await fetch(
+      `${SUPABASE_URL}/rest/v1/activations?license_key=eq.${encodeURIComponent(licenseKey)}&select=*`,
+      { method: "GET", headers }
+    );
 
     if (!activationsResp.ok) {
-      const text = await activationsResp.text();
       return res.status(500).json({
         ok: false,
         error: "Supabase activation lookup failed.",
-        details: text
+        details: await activationsResp.text()
       });
     }
 
     const activations = await activationsResp.json();
 
     const existingDevice = activations.find(
-      a => String(a.device_id) === deviceId
+      a => String(a.device_id) === deviceId && String(a.status || "active") === "active"
     );
 
-    // Existing device can continue using the license
     if (existingDevice) {
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/activations?id=eq.${encodeURIComponent(existingDevice.id)}`,
+        {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({
+            last_seen_at: new Date().toISOString(),
+            app_version: appVersion || existingDevice.app_version || null
+          })
+        }
+      );
+
       return res.status(200).json({
         ok: true,
         valid: true,
@@ -131,62 +124,60 @@ export default async function handler(req, res) {
           product: license.product,
           plan: license.plan,
           customerEmail: license.customer_email,
-          deviceLimit: deviceLimit,
+          deviceLimit,
           activationCount: activations.length
         }
       });
     }
 
-    // New device, but limit reached
-    if (activations.length >= deviceLimit) {
+    const activeActivations = activations.filter(
+      a => String(a.status || "active") === "active"
+    );
+
+    if (activeActivations.length >= deviceLimit) {
       return res.status(403).json({
         ok: false,
         valid: false,
         reason: "DEVICE_LIMIT_REACHED",
-        deviceLimit: deviceLimit,
-        activationCount: activations.length
+        deviceLimit,
+        activationCount: activeActivations.length
       });
     }
 
-    // 3. Register this device
-    const insertResp = await fetch(`${SUPABASE_URL}/rest/v1/license_activations`, {
+    const insertResp = await fetch(`${SUPABASE_URL}/rest/v1/activations`, {
       method: "POST",
       headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        "Content-Type": "application/json",
+        ...headers,
         Prefer: "return=representation"
       },
       body: JSON.stringify({
         license_key: licenseKey,
         device_id: deviceId,
+        app_version: appVersion || null,
+        platform: "android",
+        status: "active",
         activated_at: new Date().toISOString(),
         last_seen_at: new Date().toISOString()
       })
     });
 
     if (!insertResp.ok) {
-      const text = await insertResp.text();
       return res.status(500).json({
         ok: false,
         error: "Could not register activation.",
-        details: text
+        details: await insertResp.text()
       });
     }
 
-    // 4. Update activation count on license
+    const newActivationCount = activeActivations.length + 1;
+
     await fetch(
       `${SUPABASE_URL}/rest/v1/licenses?license_key=eq.${encodeURIComponent(licenseKey)}`,
       {
         method: "PATCH",
-        headers: {
-          apikey: SUPABASE_SERVICE_ROLE_KEY,
-          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-          "Content-Type": "application/json"
-        },
+        headers,
         body: JSON.stringify({
-          activation_count: activations.length + 1,
-          updated_at: new Date().toISOString()
+          activation_count: newActivationCount
         })
       }
     );
@@ -200,15 +191,15 @@ export default async function handler(req, res) {
         product: license.product,
         plan: license.plan,
         customerEmail: license.customer_email,
-        deviceLimit: deviceLimit,
-        activationCount: activations.length + 1
+        deviceLimit,
+        activationCount: newActivationCount
       }
     });
   } catch (err) {
     return res.status(500).json({
       ok: false,
       error: "License verification server error.",
-      details: err.message
+      details: err.message || String(err)
     });
   }
 }
