@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>AirAware License Test</title>
+</head>
+<body style="font-family:Arial;padding:20px">
+  <h2>AirAware License Verify Test</h2>
+  <button onclick="testLicense()">Test License</button>
+  <pre id="out" style="white-space:pre-wrap;background:#eee;padding:12px"></pre>
+
+  <script>
+    async function testLicense() {
+      const out = document.getElementById("out");
+      out.textContent = "Testing...";
+
+      try {
+        const r = await fetch("https://www.airtrueiq.com/api/license-verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            licenseKey: "AIRTRUEIQ-TEST-0001",
+            deviceId: "TEST-DEVICE-001",
+            appVersion: "v82r14"
+          })
+        });
+
+        const text = await r.text();
+        out.textContent = "HTTP " + r.status + "\n\n" + text;
+      } catch (e) {
+        out.textContent = "FETCH ERROR:\n" + e.message;
+      }
+    }
+  </script>
+</body>
+</html>
