@@ -5,139 +5,119 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AirTrueIQ Download</title>
   <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f4faf8;
-      color: #10202a;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      padding: 24px;
-    }
-
-    .card {
-      max-width: 580px;
-      width: 100%;
-      background: white;
-      border-radius: 22px;
-      padding: 32px;
-      box-shadow: 0 18px 45px rgba(0,0,0,0.12);
-      text-align: center;
-    }
-
-    .brand {
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: 32px;
-      letter-spacing: .10em;
-      text-transform: uppercase;
-      color: #071725;
-      margin-bottom: 4px;
-    }
-
-    .brand span { color: #d8a83f; }
-
-    .tagline {
-      color: #0f6b78;
-      font-size: 11px;
-      letter-spacing: .20em;
-      text-transform: uppercase;
-      font-weight: 800;
-      margin-bottom: 26px;
-    }
-
-    h1 {
-      margin: 0 0 14px;
-      font-size: 30px;
-      color: #071725;
-    }
-
-    p {
-      font-size: 17px;
-      line-height: 1.5;
-      color: #42525c;
-      margin: 0 0 18px;
-    }
-
-    .status {
-      margin: 22px 0;
-      padding: 14px 16px;
-      border-radius: 16px;
-      background: #eef7f5;
-      color: #0f6b78;
-      font-weight: bold;
-    }
-
-    .error {
-      background: #fff1f1;
-      color: #9b1c1c;
-    }
-
-    .btn {
-      display: none;
-      margin-top: 18px;
-      padding: 15px 26px;
-      border-radius: 999px;
-      background: linear-gradient(90deg, #062b36, #2fc7b7);
-      color: white;
-      text-decoration: none;
-      font-weight: 800;
-      letter-spacing: .04em;
-      box-shadow: 0 12px 26px rgba(7,23,37,.18);
-    }
-
-    .btn.secondary {
-      display: inline-flex;
-      background: white;
-      color: #071725;
-      border: 1px solid rgba(216,168,63,.45);
-      box-shadow: none;
-      margin-left: 6px;
-    }
-
-    .fineprint {
-      font-size: 13px;
-      color: #607484;
-      margin-top: 26px;
-    }
+    body { margin:0; font-family:Arial,sans-serif; background:#f4faf8; color:#10202a; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px; }
+    .card { max-width:620px; width:100%; background:#fff; border-radius:22px; padding:30px; box-shadow:0 18px 45px rgba(0,0,0,.12); text-align:center; }
+    .brand { font-family:Georgia,"Times New Roman",serif; font-size:32px; letter-spacing:.10em; text-transform:uppercase; color:#071725; margin-bottom:4px; }
+    .brand span { color:#d8a83f; }
+    .tagline { color:#0f6b78; font-size:11px; letter-spacing:.20em; text-transform:uppercase; font-weight:800; margin-bottom:24px; }
+    h1 { margin:0 0 12px; font-size:28px; color:#071725; }
+    p { font-size:16px; line-height:1.5; color:#42525c; margin:0 0 16px; }
+    .status { margin:18px 0; padding:14px 16px; border-radius:16px; background:#eef7f5; color:#0f6b78; font-weight:bold; line-height:1.45; }
+    .error { background:#fff1f1; color:#9b1c1c; }
+    .success { background:#ecfdf5; color:#047857; }
+    .licenseBox { display:none; margin-top:16px; padding:16px; border-radius:18px; background:#f8fafc; border:1px solid #dbe3ec; text-align:left; }
+    .licenseLabel { font-size:12px; font-weight:800; color:#607484; text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px; }
+    .licenseKey { word-break:break-all; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:20px; font-weight:900; color:#071725; background:#fff; border:1px dashed #d8a83f; border-radius:14px; padding:12px; text-align:center; }
+    .timer { margin-top:12px; font-size:13px; font-weight:800; color:#9a5b00; background:#fff7ed; border:1px solid #fed7aa; border-radius:999px; padding:8px 10px; text-align:center; }
+    .btnRow { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-top:16px; }
+    .btn { display:none; padding:14px 22px; border-radius:999px; background:linear-gradient(90deg,#062b36,#2fc7b7); color:white; text-decoration:none; font-weight:800; letter-spacing:.04em; border:none; cursor:pointer; box-shadow:0 12px 26px rgba(7,23,37,.18); }
+    .btn.show { display:inline-flex; align-items:center; justify-content:center; }
+    .btn.secondary { display:inline-flex; background:white; color:#071725; border:1px solid rgba(216,168,63,.45); box-shadow:none; }
+    .fineprint { font-size:13px; color:#607484; margin-top:22px; }
+    .small { font-size:13px; color:#607484; line-height:1.45; margin-top:10px; }
   </style>
 </head>
-
 <body>
   <main class="card">
     <div class="brand">AirTrue<span>IQ</span></div>
     <div class="tagline">Know the Air. Know Yourself.</div>
 
     <h1>AirAware Secure Download</h1>
-    <p>Thank you. We are verifying your secure Stripe payment.</p>
+    <p>Thank you. We are verifying your Stripe payment and preparing your license.</p>
 
     <div id="status" class="status">Checking payment...</div>
 
-    <a id="downloadBtn" class="btn" href="#">
-      Download AirAware APK
-    </a>
+    <section id="licenseBox" class="licenseBox">
+      <div class="licenseLabel">Your AirAware License Key</div>
+      <div id="licenseKey" class="licenseKey">—</div>
+      <div class="btnRow">
+        <button id="copyBtn" class="btn show" type="button">Copy License Key</button>
+        <a id="downloadBtn" class="btn" href="#">Download AirAware APK</a>
+      </div>
+      <div id="timer" class="timer">Download window: 15:00</div>
+      <div class="small">
+        Save this license key. The app locks this license to the first activated device.
+        Refreshing this page returns the same license for this payment.
+      </div>
+    </section>
 
-    <a class="btn secondary" href="/">
-      Return to AirTrueIQ
-    </a>
+    <div class="btnRow">
+      <a class="btn secondary" href="/">Return to AirTrueIQ</a>
+    </div>
 
     <p class="fineprint">
-      If the download button does not appear after a few seconds, please contact support with your payment email.
+      If your download window expires or the APK download fails, contact support with your payment email.
     </p>
   </main>
 
   <script>
+    const DOWNLOAD_WINDOW_SECONDS = 15 * 60;
+    let sessionId = null;
+    let expiresAt = null;
+    let timerHandle = null;
+
+    function setStatus(message, type) {
+      const statusEl = document.getElementById("status");
+      statusEl.textContent = message;
+      statusEl.className = "status" + (type ? " " + type : "");
+    }
+
+    function formatTime(totalSeconds) {
+      const m = Math.floor(totalSeconds / 60);
+      const s = totalSeconds % 60;
+      return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+    }
+
+    function startTimer() {
+      const timerEl = document.getElementById("timer");
+      const downloadBtn = document.getElementById("downloadBtn");
+      clearInterval(timerHandle);
+      timerHandle = setInterval(() => {
+        const secondsLeft = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+        timerEl.textContent = "Download window: " + formatTime(secondsLeft);
+        if (secondsLeft <= 0) {
+          clearInterval(timerHandle);
+          downloadBtn.classList.remove("show");
+          downloadBtn.removeAttribute("href");
+          timerEl.textContent = "Download window expired. Your license remains valid, but this download page is closed.";
+          setStatus("Download window expired. Contact support with your payment email if you need a new download window.", "error");
+        }
+      }, 1000);
+    }
+
+    async function copyLicense() {
+      const key = document.getElementById("licenseKey").textContent.trim();
+      try {
+        await navigator.clipboard.writeText(key);
+        setStatus("License key copied. Download the APK and enter this key when the app opens.", "success");
+      } catch (e) {
+        setStatus("Copy failed. Please manually select and copy the license key.", "error");
+      }
+    }
+
     async function verifyPayment() {
       const params = new URLSearchParams(window.location.search);
-      const sessionId = params.get("session_id");
+      sessionId = params.get("session_id");
 
-      const statusEl = document.getElementById("status");
+      const licenseBox = document.getElementById("licenseBox");
+      const licenseKeyEl = document.getElementById("licenseKey");
       const downloadBtn = document.getElementById("downloadBtn");
+      const copyBtn = document.getElementById("copyBtn");
+
+      copyBtn.addEventListener("click", copyLicense);
 
       if (!sessionId) {
-        statusEl.textContent = "Missing Stripe session ID. Please return to the purchase page and try again.";
-        statusEl.className = "status error";
+        setStatus("Missing Stripe session ID. Please return to the purchase page and try again.", "error");
         return;
       }
 
@@ -145,33 +125,34 @@
         const res = await fetch("/api/verify-session?session_id=" + encodeURIComponent(sessionId));
         const data = await res.json();
 
-        /*
-          Supports either API response style:
-          - { paid: true }
-          - { ok: true, allowDownload: true }
-        */
-        const verified = data && (data.paid === true || data.ok === true);
-        const allowDownload = data && (data.allowDownload !== false);
-
-        if (verified && allowDownload) {
-          statusEl.textContent = "Payment verified. Your secure download is ready.";
-          statusEl.className = "status";
-          downloadBtn.href = "/api/download-apk?session_id=" + encodeURIComponent(sessionId);
-          downloadBtn.style.display = "inline-flex";
+        if (!res.ok || !data || data.ok !== true) {
+          setStatus(data?.error || "Payment not verified yet. Please refresh in a moment.", "error");
           return;
         }
 
-        if (verified && !allowDownload) {
-          statusEl.textContent = "Your Premium membership is confirmed. No APK download is attached to this subscription checkout.";
-          statusEl.className = "status";
+        if (data.allowDownload === false) {
+          setStatus("Your payment is confirmed, but this checkout does not include an APK download.", "error");
           return;
         }
 
-        statusEl.textContent = "Payment not verified yet. Please refresh in a moment.";
-        statusEl.className = "status error";
+        const licenseKey = data.license?.licenseKey || data.licenseKey || "";
+        if (!licenseKey) {
+          setStatus("Payment verified, but no license key was returned. Contact support with your payment email.", "error");
+          return;
+        }
+
+        licenseKeyEl.textContent = licenseKey;
+        licenseBox.style.display = "block";
+        downloadBtn.href = "/api/download-apk?session_id=" + encodeURIComponent(sessionId);
+        downloadBtn.classList.add("show");
+
+        expiresAt = Date.now() + DOWNLOAD_WINDOW_SECONDS * 1000;
+        startTimer();
+
+        const reused = data.alreadyCreated ? " Existing license returned for this payment." : " New license created.";
+        setStatus("Payment verified." + reused + " Save your license key before downloading.", "success");
       } catch (err) {
-        statusEl.textContent = "Verification error. Please refresh or contact support.";
-        statusEl.className = "status error";
+        setStatus("Verification error. Please refresh or contact support with your payment email.", "error");
       }
     }
 
