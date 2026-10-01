@@ -98,6 +98,8 @@
       color: var(--gold);
     }
 
+    .mobile-wearables { display: none; }
+
     .nav-links {
       display: flex;
       align-items: center;
@@ -876,7 +878,9 @@
       }
 
       .nav-links { display: none; }
-      .nav { height: 86px; justify-content: center; }
+      .nav { height: auto; min-height: 86px; justify-content: center; flex-wrap: wrap; gap: 12px; padding-top: 14px; padding-bottom: 14px; }
+      .mobile-wearables { display: flex; flex-basis: 100%; justify-content: center; }
+      .mobile-wearables .btn { min-height: 44px; padding: 10px 22px; }
       .brand { align-items: center; }
       .logo-text-brand { gap: 10px; }
       .header-logo-icon { width: 48px; height: 48px; }
@@ -948,6 +952,9 @@
         <a href="/getting-started.html">Tutorial</a>
         <a class="btn btn-primary" href="https://buy.stripe.com/bJe28tfkWd6o00l6bQ3VC04" target="_blank" rel="noopener">Download App ›</a>
       </nav>
+      <div class="mobile-wearables">
+        <a class="btn btn-gold" href="/wearables.html">Shop Wearables</a>
+      </div>
     </div>
   </header>
 
@@ -960,6 +967,7 @@
           <p class="lead">AirAware by AirTrueIQ helps you understand how changing air conditions may affect the way you feel — so you can make more informed daily and travel choices.</p>
 
           <div class="hero-actions">
+            <a class="btn btn-gold" href="/wearables.html">Shop Wearables</a>
             <a class="btn btn-primary" href="https://buy.stripe.com/bJe28tfkWd6o00l6bQ3VC04" target="_blank" rel="noopener">Buy &amp; Download App</a>
             <a class="btn btn-secondary" href="/getting-started.html">🎥 1-Minute Tutorial</a>
             <a class="btn btn-secondary" href="#premium">View Premium</a>
